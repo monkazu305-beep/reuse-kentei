@@ -349,10 +349,51 @@ details.rq[open] summary .chev { transform: rotate(90deg); }
 .rq-body dt { color: var(--muted); }
 .rq-body dd { margin: 0; min-width: 0; }
 
+/* ---------- 本番模試: rules, timer, 判定 ---------- */
+.btn-center > .grow { align-items: center; }
+.rules { margin: 0; display: grid; grid-template-columns: auto 1fr; }
+.rules dt, .rules dd { padding: 12px 16px; border-top: 1px solid var(--line); margin: 0; }
+.rules dt:first-of-type, .rules dt:first-of-type + dd { border-top: 0; }
+.rules dt { color: var(--muted); font-size: 14px; }
+.rules dd { font-weight: 700; font-variant-numeric: tabular-nums; }
+.notes { margin: 0; padding-left: 1.3em; font-size: 14px; line-height: 1.8; color: var(--muted); }
+#timer.warn { color: var(--ng); font-weight: 700; }
+
+.judge { padding: 20px; display: flex; flex-direction: column; gap: 18px; border-width: 1.5px; }
+.judge.pass { border-color: var(--ok); }
+.judge.fail { border-color: var(--ng); }
+.judge-head { display: flex; align-items: center; gap: var(--s4); }
+.stamp {
+  flex: none; width: 92px; height: 92px; border-radius: 50%; display: grid; place-items: center;
+  border: 4px double currentColor; font-family: var(--f-display); font-weight: 900; letter-spacing: 0.04em;
+  transform: rotate(-8deg);
+}
+.judge.pass .stamp { color: var(--ok); font-size: 30px; background: var(--ok-bg); }
+.judge.fail .stamp { color: var(--ng); font-size: 22px; background: var(--ng-bg); }
+.judge-note { font-size: 14px; font-weight: 700; margin-top: 4px; }
+.judge.pass .judge-note { color: var(--ok); }
+.judge.fail .judge-note { color: var(--ng); }
+.meter { position: relative; padding-bottom: 22px; }
+.meter-track { display: block; height: 10px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.meter-track i { display: block; height: 100%; border-radius: 999px; }
+.judge.pass .meter-track i { background: var(--ok); }
+.judge.fail .meter-track i { background: var(--ng); }
+.meter-line { position: absolute; top: -4px; width: 2px; height: 18px; margin-left: -1px; background: var(--ink); border-radius: 1px; }
+.meter-label { position: absolute; top: 18px; transform: translateX(-50%); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.judge-facts { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 14px; font-variant-numeric: tabular-nums; border-top: 1px solid var(--line); padding-top: 14px; }
+.judge-facts dt { color: var(--muted); }
+.judge-facts dd { margin: 0; }
+.tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.tag.pass { background: var(--ok); color: var(--surface); }
+.tag.fail { background: var(--ng); color: var(--surface); }
+.muted { color: var(--muted); }
+
 /* ---------- Records ---------- */
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
-th, td { text-align: left; padding: 10px 16px; border-top: 1px solid var(--line); white-space: nowrap; }
+th, td { text-align: left; padding: 10px 8px; border-top: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { padding-left: 16px; }
+th:last-child, td:last-child { padding-right: 16px; }
 thead th { border-top: 0; font-size: 12px; color: var(--muted); font-weight: 700; }
 td.r, th.r { text-align: right; }
 .danger { color: var(--ng); }
@@ -387,6 +428,8 @@ td.r, th.r { text-align: right; }
   var STORE_KEY = 'reuse-kentei-v1';
   var KANA = ['ア', 'イ', 'ウ', 'エ', 'オ', 'カ', 'キ', 'ク', 'ケ', 'コ'];
   var LEVEL = ['', '基礎', '標準', '応用'];
+  // 本番のリユース検定と同じ形式：択一50問・60分・1問2点・90点（45問）以上で合格
+  var EXAM = { n: 50, sec: 3600, point: 2, pass: 90 };
   var app = document.getElementById('app');
   var DATA = null, QMAP = {}, CHMAP = {};
   var store = loadStore();
@@ -494,16 +537,18 @@ td.r, th.r { text-align: right; }
     });
     store.session = {
       mode: mode, title: title, ids: ids, i: opt.start || 0, order: order, picked: [],
-      answered: false, results: [], start: Date.now(), back: opt.back || 'home', done: false
+      answered: false, results: [], start: Date.now(), back: opt.back || 'home', done: false,
+      exam: !!opt.exam, limit: opt.limit || 0
     };
     resetOpen = false;
     save();
     go('quiz');
   }
-  function pickMock(total) {
+  function pickMock(total, pool) {
+    pool = pool || DATA.questions;
     var by = {};
-    DATA.questions.forEach(function (q) { (by[q.ch] = by[q.ch] || []).push(q.id); });
-    var N = DATA.questions.length;
+    pool.forEach(function (q) { (by[q.ch] = by[q.ch] || []).push(q.id); });
+    var N = pool.length;
     if (total >= N) return DATA.chapters.reduce(function (a, c) { return a.concat(shuffle(by[c.id] || [])); }, []);
     var quotas = DATA.chapters.map(function (c) {
       var exact = (by[c.id] || []).length * total / N;
@@ -524,14 +569,28 @@ td.r, th.r { text-align: right; }
         by[ch] = by[ch] || [0, 0];
         by[ch][1]++; if (r.ok) by[ch][0]++;
       });
-      store.mocks.unshift({
-        t: s.end, n: s.results.length, c: s.results.filter(function (r) { return r.ok; }).length,
-        sec: Math.round((s.end - s.start) / 1000), by: by
-      });
+      var c = s.results.filter(function (r) { return r.ok; }).length;
+      var sec = Math.round((s.end - s.start) / 1000);
+      var m = { t: s.end, n: s.results.length, c: c, sec: s.limit ? Math.min(sec, s.limit) : sec, by: by };
+      if (s.exam) { m.exam = true; m.score = examScore(c); m.pass = m.score >= EXAM.pass; m.timeUp = !!s.timeUp; }
+      store.mocks.unshift(m);
       store.mocks = store.mocks.slice(0, 20);
     }
     save();
     go('result', true);
+  }
+  function examScore(c) { return c * EXAM.point; }
+  function timeLeft(s) { return s.limit ? s.limit - Math.floor((Date.now() - s.start) / 1000) : Infinity; }
+  // time is up: the choice on screen still counts, everything after it is scored as unanswered
+  function timeUp() {
+    var s = store.session;
+    if (!s || s.done) return;
+    for (var k = s.i; k < s.ids.length; k++) {
+      var id = s.ids[k], picked = k === s.i ? s.picked.slice() : [];
+      s.results.push({ id: id, picked: picked, ok: picked.length > 0 && sameSet(picked, QMAP[id].answer) });
+    }
+    s.i = s.ids.length; s.timeUp = true;
+    finish();
   }
 
   /* ---------- actions ---------- */
@@ -563,6 +622,12 @@ td.r, th.r { text-align: right; }
     if (act === 'mock') {
       var n = Number(el.getAttribute('data-n'));
       startSession('mock', pickMock(n), n >= DATA.questions.length ? '全問模試' : 'ミニ模試', { back: 'home' });
+      return;
+    }
+    if (act === 'exam-start') {
+      // the real exam is single-answer only, so 「すべて選べ」 questions stay out
+      var singles = DATA.questions.filter(function (x) { return x.type === 'single'; });
+      startSession('mock', pickMock(EXAM.n, singles), '本番模試', { back: 'home', exam: true, limit: EXAM.sec });
       return;
     }
     if (act === 'ch-start') {
@@ -639,6 +704,7 @@ td.r, th.r { text-align: right; }
     if (r === 'quiz') html = viewQuiz();
     else if (r === 'result') html = viewResult();
     else if (r === 'stats') html = viewStats();
+    else if (r === 'exam') html = viewExam();
     else if (/^ch-\d+$/.test(r) && CHMAP[Number(r.slice(3))]) html = viewChapter(Number(r.slice(3)));
     else html = viewHome();
     if (html === null) return;
@@ -647,7 +713,13 @@ td.r, th.r { text-align: right; }
     if (r === 'quiz' && store.session && store.session.mode === 'mock') {
       var t = document.getElementById('timer');
       tick = setInterval(function () {
-        if (t && store.session) t.textContent = fmtTime(Math.round((Date.now() - store.session.start) / 1000));
+        var ss = store.session;
+        if (!ss || ss.done) return;
+        if (ss.limit) {
+          var left = timeLeft(ss);
+          if (left <= 0) { clearInterval(tick); tick = null; timeUp(); return; }
+          if (t) { t.textContent = '残り ' + fmtTime(left); t.className = left <= 300 ? 'warn' : ''; }
+        } else if (t) t.textContent = fmtTime(Math.round((Date.now() - ss.start) / 1000));
       }, 1000);
     }
   }
@@ -666,8 +738,10 @@ td.r, th.r { text-align: right; }
       '<p class="plate-bottom">全' + DATA.chapters.length + '章・' + DATA.questions.length + '問</p></header>';
 
     if (s && !s.done) {
+      var left = timeLeft(s);
+      var clock = s.limit ? (left > 0 ? '・残り' + Math.ceil(left / 60) + '分' : '・時間切れ（開くと採点します）') : '';
       h += '<button type="button" class="btn resume" data-act="resume"><span class="grow">続きから再開' +
-        '<span class="sub">' + esc(s.title) + '・' + (s.i + 1) + '問目 / ' + s.ids.length + '問</span></span><span class="chev">›</span></button>';
+        '<span class="sub">' + esc(s.title) + '・' + (s.i + 1) + '問目 / ' + s.ids.length + '問' + clock + '</span></span><span class="chev">›</span></button>';
     }
 
     h += '<section class="card stats-row" aria-label="学習の状況">' +
@@ -680,8 +754,10 @@ td.r, th.r { text-align: right; }
     h += '<button type="button" class="btn" data-act="weak"' + (weak ? '' : ' aria-disabled="true"') + '>' +
       '<span class="grow">苦手ノート<span class="sub">' + (weak ? '間違えた問題を解き直す。覚えたら自分で外せます' : '間違えた問題がここにたまります') + '</span></span>' +
       '<span class="pricetag' + (weak ? '' : ' is-zero') + '">' + weak + '</span></button>';
-    h += '<button type="button" class="btn btn-primary" data-act="mock" data-n="20"><span class="grow">ミニ模試 20問' +
-      '<span class="sub">全章から出題。採点は最後にまとめて</span></span><span class="chev">›</span></button>';
+    h += '<a class="btn btn-primary" href="#exam"><span class="grow">本番模試 ' + EXAM.n + '問' +
+      '<span class="sub">本番と同じ' + EXAM.sec / 60 + '分・' + EXAM.pass + '点以上で合格</span></span><span class="chev">›</span></a>';
+    h += '<button type="button" class="btn" data-act="mock" data-n="20"><span class="grow">ミニ模試 20問' +
+      '<span class="sub">全章から出題。時間制限なし、採点は最後にまとめて</span></span><span class="chev">›</span></button>';
     h += '<button type="button" class="btn" data-act="mock" data-n="' + DATA.questions.length + '"><span class="grow">全' + DATA.questions.length + '問 通し模試' +
       '<span class="sub">章の順に全問。受験直前の総仕上げに</span></span><span class="chev">›</span></button>';
     h += '</section>';
@@ -734,8 +810,12 @@ td.r, th.r { text-align: right; }
   function viewQuiz() {
     var s = store.session;
     if (!s || s.done) { go('home', true); return null; }
+    if (timeLeft(s) <= 0) { timeUp(); return null; }
     var id = s.ids[s.i], q = QMAP[id], perm = s.order[id];
     var mock = s.mode === 'mock', multi = q.type === 'multi', ox = q.format === 'ox';
+    var clock = '';
+    if (s.limit) { var left = timeLeft(s); clock = '<span id="timer"' + (left <= 300 ? ' class="warn"' : '') + '>残り ' + fmtTime(left) + '</span>'; }
+    else if (mock) clock = '<span id="timer">' + fmtTime(Math.round((Date.now() - s.start) / 1000)) + '</span>';
     var answered = s.answered && !mock;
     var last = answered ? s.results[s.results.length - 1] : null;
 
@@ -743,7 +823,7 @@ td.r, th.r { text-align: right; }
     h += '<div class="topbar"><div class="topbar-row">' +
       '<button type="button" class="quit" data-act="quit">中断</button>' +
       '<p class="topbar-title">' + esc(s.title) + '・' + (s.i + 1) + ' / ' + s.ids.length + '</p>' +
-      '<p class="topbar-side">' + (mock ? '<span id="timer">' + fmtTime(Math.round((Date.now() - s.start) / 1000)) + '</span>' : '') + '</p></div>' +
+      '<p class="topbar-side">' + clock + '</p></div>' +
       '<div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="' + s.ids.length + '" aria-valuenow="' + s.i + '"><i style="width:' + pct(s.i, s.ids.length) + '%"></i></div></div>';
 
     h += '<div class="stack"><p class="q-meta"><span class="mono">' + q.id + '</span><span>' + esc(CHMAP[q.ch].title) + '</span><span>' + LEVEL[q.level] + '</span>' +
@@ -823,6 +903,48 @@ td.r, th.r { text-align: right; }
       '<text x="46" y="52" text-anchor="middle" font-size="18" font-weight="700" fill="var(--ink)" font-family="var(--f-display)">' + pct(c, n) + '%</text></svg>';
   }
 
+  // 本番模試の合否：判子と点数、合格ラインまでの距離
+  function judgeCard(s, c, n) {
+    var full = n * EXAM.point, score = examScore(c), pass = score >= EXAM.pass;
+    var sec = Math.min(Math.round((s.end - s.start) / 1000), s.limit);
+    var blank = s.results.filter(function (r) { return !r.picked.length; }).length;
+    var gap = Math.abs(score - EXAM.pass);
+    var note = pass
+      ? (gap ? '合格ラインを' + gap + '点上回りました。' : 'ちょうど合格ラインです。')
+      : 'あと' + gap + '点（' + Math.ceil(gap / EXAM.point) + '問）で合格です。';
+    var at = Math.min(100, EXAM.pass / full * 100);
+    var h = '<section class="card judge ' + (pass ? 'pass' : 'fail') + '" aria-label="判定">';
+    h += '<div class="judge-head"><span class="stamp" role="img" aria-label="' + (pass ? '合格' : '不合格') + '">' + (pass ? '合格' : '不合格') + '</span>' +
+      '<div><p class="score-big">' + score + '<small>点 / ' + full + '点</small></p>' +
+      '<p class="judge-note">' + note + '</p></div></div>';
+    h += '<div class="meter" aria-hidden="true"><span class="meter-track"><i style="width:' + Math.round(score / full * 100) + '%"></i></span>' +
+      '<b class="meter-line" style="left:' + at + '%"></b><span class="meter-label" style="left:' + at + '%">合格 ' + EXAM.pass + '点</span></div>';
+    h += '<dl class="judge-facts"><dt>正解</dt><dd>' + c + ' / ' + n + '問</dd>' +
+      '<dt>時間</dt><dd>' + fmtTime(sec) + ' / ' + fmtTime(s.limit) + '</dd>' +
+      (blank ? '<dt>未回答</dt><dd>' + blank + '問' + (s.timeUp ? '（時間切れ）' : '') + '</dd>' : '') + '</dl>';
+    h += '</section>';
+    return h;
+  }
+
+  function viewExam() {
+    var h = '<div class="wrap"><a class="back" href="#home">‹ ホーム</a>';
+    h += '<h1 class="page-title"><small>本番形式</small>本番模試 ' + EXAM.n + '問</h1>';
+    h += '<section class="card"><dl class="rules">' +
+      '<dt>問題数</dt><dd>' + EXAM.n + '問（すべて択一）</dd>' +
+      '<dt>試験時間</dt><dd>' + EXAM.sec / 60 + '分</dd>' +
+      '<dt>配点</dt><dd>1問' + EXAM.point + '点・' + EXAM.n * EXAM.point + '点満点</dd>' +
+      '<dt>合格</dt><dd>' + EXAM.pass + '点以上（' + EXAM.pass / EXAM.point + '問正解）</dd></dl></section>';
+    h += '<ul class="notes">' +
+      '<li>本番と同じく、途中で答え合わせはしません。最後にまとめて採点します。</li>' +
+      '<li>中断しても時間は進みます。' + EXAM.sec / 60 + '分たつと、その時点で採点します。</li>' +
+      '<li>全章から章の割合に合わせて出題します。「すべて選べ」の問題は出ません。</li></ul>';
+    var last = store.mocks.filter(function (m) { return m.exam; })[0];
+    if (last) h += '<p class="verdict-sub">前回の本番模試：' + last.score + '点（' + (last.pass ? '合格' : '不合格') + '）・' + fmtDate(last.t) + '</p>';
+    h += '<button type="button" class="btn btn-primary btn-center" data-act="exam-start"><span class="grow">開始する（' + EXAM.sec / 60 + '分）</span></button>';
+    h += '</div>';
+    return h;
+  }
+
   function viewResult() {
     var s = store.session;
     if (!s || !s.done) { go('home', true); return null; }
@@ -830,7 +952,8 @@ td.r, th.r { text-align: right; }
     var wrong = n - c;
     var h = '<div class="wrap"><a class="back" href="#home">‹ ホーム</a>';
     h += '<h1 class="page-title"><small>' + esc(s.title) + 'の結果</small>' + (s.mode === 'mock' ? '採点しました' : 'おつかれさまでした') + '</h1>';
-    h += '<section class="card score">' + ring(c, n) + '<div><p class="score-big">' + c + '<small> / ' + n + '問</small></p>' +
+    if (s.exam) h += judgeCard(s, c, n);
+    else h += '<section class="card score">' + ring(c, n) + '<div><p class="score-big">' + c + '<small> / ' + n + '問</small></p>' +
       '<p class="verdict-sub">' + (s.mode === 'mock' ? '所要時間 ' + fmtTime(Math.round((s.end - s.start) / 1000)) : '正解 ' + c + '問・不正解 ' + wrong + '問') + '</p></div></section>';
 
     var chs = {};
@@ -878,11 +1001,15 @@ td.r, th.r { text-align: right; }
     h += '</ul></div></section>';
 
     h += '<section class="stack"><h2 class="section-label">模試の履歴</h2><div class="card">';
-    if (!store.mocks.length) h += '<p class="empty">まだ模試を受けていません。ホームの「ミニ模試 20問」から始められます。</p>';
+    if (!store.mocks.length) h += '<p class="empty">まだ模試を受けていません。ホームの「本番模試 ' + EXAM.n + '問」から始められます。</p>';
     else {
-      h += '<div class="table-wrap"><table><thead><tr><th>日時</th><th class="r">得点</th><th class="r">正答率</th><th class="r">時間</th></tr></thead><tbody>';
+      h += '<div class="table-wrap"><table><thead><tr><th>日時</th><th>模試</th><th class="r">得点</th><th>結果</th><th class="r">時間</th></tr></thead><tbody>';
       store.mocks.forEach(function (m) {
-        h += '<tr><td>' + fmtDate(m.t) + '</td><td class="r">' + m.c + ' / ' + m.n + '</td><td class="r">' + pct(m.c, m.n) + '%</td><td class="r">' + fmtTime(m.sec) + '</td></tr>';
+        var kind = m.exam ? '本番' : (m.n >= DATA.questions.length ? '全問' : 'ミニ');
+        h += '<tr><td>' + fmtDate(m.t) + '</td><td>' + kind + '</td>' +
+          '<td class="r">' + (m.exam ? m.score + '点' : m.c + ' / ' + m.n) + '</td>' +
+          '<td>' + (m.exam ? '<span class="tag ' + (m.pass ? 'pass' : 'fail') + '">' + (m.pass ? '合格' : '不合格') + '</span>' : '<span class="muted">' + pct(m.c, m.n) + '%</span>') + '</td>' +
+          '<td class="r">' + fmtTime(m.sec) + '</td></tr>';
       });
       h += '</tbody></table></div>';
     }
