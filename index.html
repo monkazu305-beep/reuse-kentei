@@ -1,0 +1,892 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F1F3F8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E1320" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="検定演習帳">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<style>
+:root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+<title>リユース検定演習帳</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@500&family=Zen+Kaku+Gothic+New:wght@700;900&display=swap">
+<style>
+/* Layout: one 560px column. Home opens with a navy 古物商-plate header, then actions and a chapter list.
+   Quiz: sticky top bar (progress), question, ア/イ/ウ choices, sticky bottom action bar. */
+:root {
+  --bg: #F1F3F8;
+  --surface: #FFFFFF;
+  --ink: #151C2C;
+  --muted: #566177;
+  --line: #D8DEE9;
+  --plate: #1C2A4E;
+  --plate-ink: #FFFFFF;
+  --plate-sub: #B7C2DE;
+  --tag: #E6AF1C;
+  --tag-ink: #261E03;
+  --ok: #16764F;
+  --ok-bg: #E1F1E9;
+  --ng: #BC3A26;
+  --ng-bg: #FAE7E2;
+  --pick: #2B4897;
+  --pick-bg: #E6EBF8;
+  --focus: #2E54D3;
+
+  --f-display: "Zen Kaku Gothic New", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
+  --f-body: "BIZ UDPGothic", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", "Noto Sans JP", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --r: 12px;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1320; --surface: #161D2F; --ink: #E5E9F2; --muted: #9AA4BA; --line: #29345A;
+    --plate: #22325F; --plate-ink: #FFFFFF; --plate-sub: #A9B6D8;
+    --tag: #E6AF1C; --tag-ink: #261E03;
+    --ok: #52C69A; --ok-bg: #0F2A1F; --ng: #F07F67; --ng-bg: #37170F;
+    --pick: #A0B5F3; --pick-bg: #1C2747; --focus: #8EA8F5;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1320; --surface: #161D2F; --ink: #E5E9F2; --muted: #9AA4BA; --line: #29345A;
+  --plate: #22325F; --plate-ink: #FFFFFF; --plate-sub: #A9B6D8;
+  --tag: #E6AF1C; --tag-ink: #261E03;
+  --ok: #52C69A; --ok-bg: #0F2A1F; --ng: #F07F67; --ng-bg: #37170F;
+  --pick: #A0B5F3; --pick-bg: #1C2747; --focus: #8EA8F5;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+  z-index: 10; background: var(--bg);
+}
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; }
+p { margin: 0; }
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
+.mono { font-family: var(--f-mono); font-size: 0.8em; letter-spacing: 0.02em; }
+.num { font-variant-numeric: tabular-nums; }
+
+.wrap {
+  max-width: 560px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: var(--s4) var(--s6);
+  display: flex; flex-direction: column; gap: var(--s5);
+}
+.stack { display: flex; flex-direction: column; gap: var(--s3); }
+.section-label {
+  font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: 0.08em;
+}
+
+/* ---------- Plate header (modeled on the 古物商 標識: navy ground, white letters) ---------- */
+.plate {
+  position: relative; background: var(--plate); color: var(--plate-ink);
+  border-radius: 10px; padding: 22px 20px 18px; text-align: center;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.plate::after {
+  content: ""; position: absolute; inset: 7px; border: 1.5px solid rgba(255,255,255,.5);
+  border-radius: 6px; pointer-events: none;
+}
+.plate::before {
+  content: ""; position: absolute; inset: 12px; pointer-events: none;
+  background:
+    radial-gradient(circle at 0 0, rgba(255,255,255,.55) 2.5px, transparent 3px) top left / 8px 8px no-repeat,
+    radial-gradient(circle at 100% 0, rgba(255,255,255,.55) 2.5px, transparent 3px) top right / 8px 8px no-repeat,
+    radial-gradient(circle at 0 100%, rgba(255,255,255,.55) 2.5px, transparent 3px) bottom left / 8px 8px no-repeat,
+    radial-gradient(circle at 100% 100%, rgba(255,255,255,.55) 2.5px, transparent 3px) bottom right / 8px 8px no-repeat;
+}
+.plate-top { font-size: 12px; color: var(--plate-sub); letter-spacing: 0.18em; }
+.plate-name { font-size: clamp(26px, 7.4vw, 34px); font-weight: 900; letter-spacing: 0.06em; line-height: 1.3; }
+.plate-bottom { font-size: 13px; color: var(--plate-sub); letter-spacing: 0.08em; }
+
+/* ---------- Surfaces ---------- */
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+}
+.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); }
+.stat { padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.stat + .stat { border-left: 1px solid var(--line); }
+.stat-label { font-size: 12px; color: var(--muted); }
+.stat-value { font-family: var(--f-display); font-weight: 700; font-size: 22px; line-height: 1.3; font-variant-numeric: tabular-nums; }
+.stat-value small { font-size: 13px; font-weight: 700; color: var(--muted); margin-left: 2px; }
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: flex; align-items: center; gap: var(--s3); width: 100%; min-height: 56px;
+  padding: 12px 16px; border-radius: var(--r); border: 1px solid var(--line);
+  background: var(--surface); text-align: left; cursor: pointer; text-decoration: none;
+  font-weight: 700; line-height: 1.45;
+}
+.btn > .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.btn .sub { font-weight: 400; font-size: 13px; color: var(--muted); }
+.btn-primary { background: var(--plate); border-color: var(--plate); color: var(--plate-ink); }
+.btn-primary .sub { color: var(--plate-sub); }
+.btn[aria-disabled="true"] { cursor: default; }
+.btn-center { justify-content: center; text-align: center; }
+.chev { color: var(--muted); font-size: 20px; line-height: 1; }
+.btn-primary .chev { color: var(--plate-sub); }
+.btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
+.link-btn {
+  background: none; border: 0; padding: 8px 4px; cursor: pointer; color: var(--muted);
+  font-size: 14px; text-decoration: underline; text-underline-offset: 3px;
+}
+
+/* 値札-style count: a price tag with a punched hole */
+.pricetag {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  min-width: 46px; height: 28px; padding: 0 10px 0 16px;
+  background: var(--tag); color: var(--tag-ink); font-weight: 700; font-variant-numeric: tabular-nums;
+  clip-path: polygon(10px 0, 100% 0, 100% 100%, 10px 100%, 0 50%);
+  border-radius: 0 6px 6px 0; font-size: 15px;
+}
+.pricetag::before {
+  content: ""; position: absolute; left: 8px; top: 50%; width: 5px; height: 5px; margin-top: -2.5px;
+  border-radius: 50%; background: var(--surface);
+}
+.pricetag.is-zero { background: var(--line); color: var(--muted); }
+
+/* ---------- Chapter list ---------- */
+.ch-list { list-style: none; margin: 0; padding: 0; }
+.ch-list li + li { border-top: 1px solid var(--line); }
+.ch-row {
+  display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: var(--s3);
+  padding: 14px 16px; text-decoration: none;
+}
+.ch-no {
+  width: 40px; height: 40px; border-radius: 8px; background: var(--plate); color: var(--plate-ink);
+  display: grid; place-items: center; font-family: var(--f-display); font-weight: 900; font-size: 18px;
+}
+.ch-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ch-title { font-weight: 700; line-height: 1.4; }
+.ch-title span { font-weight: 400; color: var(--muted); font-size: 14px; margin-left: 6px; }
+.ch-meta { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.bar { display: flex; height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.bar i { display: block; height: 100%; }
+.bar .b-ok { background: var(--ok); }
+.bar .b-ng { background: var(--ng); }
+.legend { display: flex; gap: var(--s4); font-size: 12px; color: var(--muted); padding: 10px 16px; border-top: 1px solid var(--line); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+/* ---------- Resume ---------- */
+.resume { border: 1.5px dashed var(--pick); background: var(--pick-bg); }
+.resume .sub { color: var(--muted); }
+
+/* ---------- Page heads ---------- */
+.back {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 14px; color: var(--muted);
+  text-decoration: none; padding: 6px 0; align-self: flex-start;
+}
+.page-title { font-size: 24px; font-weight: 900; line-height: 1.35; }
+.page-title small { display: block; font-size: 14px; font-weight: 700; color: var(--muted); letter-spacing: 0.08em; }
+
+/* ---------- Question list in chapter ---------- */
+.q-list { list-style: none; margin: 0; padding: 0; }
+.q-list li + li { border-top: 1px solid var(--line); }
+.q-row {
+  display: grid; grid-template-columns: 14px 1fr; gap: var(--s3); align-items: start;
+  width: 100%; padding: 12px 16px; background: none; border: 0; text-align: left; cursor: pointer;
+}
+.dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 7px; background: var(--line); }
+.dot.ok { background: var(--ok); }
+.dot.ng { background: var(--ng); }
+.q-row-text { min-width: 0; font-size: 14px; line-height: 1.6; }
+.q-row-text .mono { color: var(--muted); display: block; }
+.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* ---------- Quiz ---------- */
+.quiz { gap: var(--s4); padding-top: 0; }
+.topbar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg);
+  padding-block: 10px 8px; display: flex; flex-direction: column; gap: 8px;
+}
+.topbar-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--s2); }
+.topbar-title { text-align: center; font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; min-width: 0; }
+.topbar-side { min-width: 56px; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+.quit {
+  min-width: 56px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--surface); cursor: pointer; font-size: 14px;
+}
+.progress { height: 4px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.progress i { display: block; height: 100%; background: var(--plate); }
+:root[data-theme="dark"] .progress i { background: var(--pick); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .progress i { background: var(--pick); } }
+
+.q-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 13px; color: var(--muted); }
+.chip {
+  display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface); font-size: 12px; font-weight: 700; color: var(--ink);
+}
+.chip.multi { border-color: var(--pick); color: var(--pick); background: var(--pick-bg); }
+.q-text { font-size: 18px; line-height: 1.75; font-weight: 700; white-space: pre-line; }
+
+.choices { display: flex; flex-direction: column; gap: 10px; }
+.choice {
+  display: grid; grid-template-columns: 30px 1fr auto; align-items: start; gap: var(--s3);
+  width: 100%; padding: 13px 14px; border: 1.5px solid var(--line); border-radius: var(--r);
+  background: var(--surface); text-align: left; cursor: pointer; line-height: 1.6;
+}
+.choice-key {
+  width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--bg); border: 1px solid var(--line); font-family: var(--f-display); font-weight: 700; font-size: 15px;
+}
+.choice-text { min-width: 0; padding-top: 2px; }
+.choice-tag {
+  align-self: center; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+}
+.check {
+  align-self: center; width: 22px; height: 22px; border-radius: 5px; border: 2px solid var(--line);
+  display: grid; place-items: center;
+}
+.choice.is-picked { border-color: var(--pick); background: var(--pick-bg); }
+.choice.is-picked .choice-key { background: var(--pick); color: var(--surface); border-color: var(--pick); }
+.choice.is-picked .check { background: var(--pick); border-color: var(--pick); }
+.choice.is-picked .check::after { content: ""; width: 6px; height: 11px; border: solid var(--surface); border-width: 0 2.5px 2.5px 0; transform: translateY(-1px) rotate(45deg); }
+.choice.is-correct { border-color: var(--ok); background: var(--ok-bg); }
+.choice.is-correct .choice-key { background: var(--ok); color: var(--surface); border-color: var(--ok); }
+.choice.is-correct .choice-tag { background: var(--ok); color: var(--surface); }
+.choice.is-missed { border-color: var(--ok); border-style: dashed; }
+.choice.is-missed .choice-tag { color: var(--ok); border: 1.5px solid var(--ok); }
+.choice.is-wrong { border-color: var(--ng); background: var(--ng-bg); }
+.choice.is-wrong .choice-key { background: var(--ng); color: var(--surface); border-color: var(--ng); }
+.choice.is-wrong .choice-tag { background: var(--ng); color: var(--surface); }
+.choice.is-dim { color: var(--muted); }
+.choice[aria-disabled="true"] { cursor: default; }
+.choices.ox { flex-direction: row; }
+.choices.ox .choice { grid-template-columns: 1fr; justify-items: center; padding: 18px 10px; }
+.choices.ox .choice-text { font-size: 34px; line-height: 1; font-family: var(--f-display); font-weight: 900; }
+.choices.ox .choice-tag { margin-top: 8px; }
+
+.verdict {
+  border-radius: var(--r); padding: 16px; border: 1.5px solid var(--line); background: var(--surface);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.verdict-head { display: flex; align-items: center; gap: 12px; }
+.mark { width: 36px; height: 36px; flex: none; position: relative; }
+.mark.ok { border: 4px solid var(--ok); border-radius: 50%; }
+.mark.ng::before, .mark.ng::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 38px; height: 4.5px; border-radius: 3px;
+  background: var(--ng); transform: translate(-50%, -50%) rotate(45deg);
+}
+.mark.ng::after { transform: translate(-50%, -50%) rotate(-45deg); }
+.verdict-title { font-family: var(--f-display); font-size: 22px; font-weight: 900; }
+.verdict.ok .verdict-title { color: var(--ok); }
+.verdict.ng .verdict-title { color: var(--ng); }
+.verdict-sub { font-size: 14px; color: var(--muted); }
+.exp-label { font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: 0.1em; border-top: 1px solid var(--line); padding-top: 10px; }
+.exp { font-size: 15px; line-height: 1.85; }
+.note { font-size: 13px; color: var(--ok); font-weight: 700; }
+
+.actionbar {
+  position: sticky; bottom: 0; z-index: 4; margin-top: var(--s2);
+  padding-top: 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  background: var(--bg); border-top: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 6px; align-items: stretch;
+}
+.actionbar .hint { text-align: center; font-size: 13px; color: var(--muted); padding: 8px 0; }
+.btn-main {
+  min-height: 52px; border-radius: var(--r); border: 0; background: var(--plate); color: var(--plate-ink);
+  font-weight: 700; font-size: 16px; cursor: pointer; font-family: var(--f-body);
+}
+.btn-main[disabled] { background: var(--line); color: var(--muted); cursor: default; }
+
+/* ---------- Results ---------- */
+.score {
+  display: flex; align-items: center; gap: var(--s4); padding: 20px;
+}
+.score-ring { width: 92px; height: 92px; flex: none; }
+.score-big { font-family: var(--f-display); font-weight: 900; font-size: 34px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.score-big small { font-size: 18px; color: var(--muted); font-weight: 700; }
+.breakdown { list-style: none; margin: 0; padding: 0; }
+.breakdown li { display: grid; grid-template-columns: 4.5em 1fr 4.5em; align-items: center; gap: var(--s3); padding: 10px 16px; font-size: 14px; }
+.breakdown li + li { border-top: 1px solid var(--line); }
+.breakdown .r { text-align: right; font-variant-numeric: tabular-nums; }
+details.rq { border-top: 1px solid var(--line); }
+details.rq:first-child { border-top: 0; }
+details.rq summary {
+  list-style: none; cursor: pointer; display: grid; grid-template-columns: 22px 1fr auto; gap: var(--s3);
+  align-items: start; padding: 12px 16px; font-size: 14px; line-height: 1.6;
+}
+details.rq summary::-webkit-details-marker { display: none; }
+details.rq summary .chev { transition: transform .15s; align-self: center; }
+details.rq[open] summary .chev { transform: rotate(90deg); }
+.mk { font-weight: 900; font-family: var(--f-display); font-size: 19px; line-height: 1.3; }
+.mk.ok { color: var(--ok); }
+.mk.ng { color: var(--ng); }
+.rq-body { padding: 0 16px 14px 50px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.rq-body dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; }
+.rq-body dt { color: var(--muted); }
+.rq-body dd { margin: 0; min-width: 0; }
+
+/* ---------- Records ---------- */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 10px 16px; border-top: 1px solid var(--line); white-space: nowrap; }
+thead th { border-top: 0; font-size: 12px; color: var(--muted); font-weight: 700; }
+td.r, th.r { text-align: right; }
+.danger { color: var(--ng); }
+.confirm { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.confirm .btn-row .btn { min-height: 44px; justify-content: center; }
+.btn-danger { background: var(--ng); border-color: var(--ng); color: var(--surface); }
+.empty { padding: 16px; font-size: 14px; color: var(--muted); }
+
+.foot { font-size: 12px; color: var(--muted); line-height: 1.7; display: flex; flex-direction: column; gap: 4px; }
+.foot a { color: var(--muted); }
+.loading { padding: 40px 0; text-align: center; color: var(--muted); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .choice, .btn, .btn-main { transition: background-color .12s, border-color .12s; }
+  .verdict { animation: rise .18s ease-out; }
+  @keyframes rise { from { transform: translateY(6px); } to { transform: none; } }
+}
+@media (hover: hover) {
+  .choice:not([aria-disabled="true"]):hover { border-color: var(--pick); }
+  .btn:not([aria-disabled="true"]):hover { border-color: var(--pick); }
+  .q-row:hover, .ch-row:hover { background: var(--bg); }
+}
+</style>
+</head>
+<body>
+<div id="app"><div class="wrap"><p class="loading">問題を読み込んでいます…</p></div></div>
+
+<script id="qdata" type="application/json"></script>
+<script>
+(function () {
+  'use strict';
+  var STORE_KEY = 'reuse-kentei-v1';
+  var KANA = ['ア', 'イ', 'ウ', 'エ', 'オ', 'カ', 'キ', 'ク', 'ケ', 'コ'];
+  var LEVEL = ['', '基礎', '標準', '応用'];
+  var app = document.getElementById('app');
+  var DATA = null, QMAP = {}, CHMAP = {};
+  var store = loadStore();
+  var tick = null;
+  var resetOpen = false;
+  var lastRoute = null;
+
+  /* ---------- storage (this device only; works in memory if storage is blocked) ---------- */
+  function loadStore() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (raw) {
+        var s = JSON.parse(raw);
+        return { rec: s.rec || {}, mocks: s.mocks || [], days: s.days || {}, session: s.session || null };
+      }
+    } catch (e) {}
+    return { rec: {}, mocks: [], days: {}, session: null };
+  }
+  function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) {} }
+
+  /* ---------- helpers ---------- */
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function dayKey(d) {
+    d = d || new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function shuffle(a) {
+    a = a.slice();
+    for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; }
+    return a;
+  }
+  function sameSet(a, b) {
+    if (a.length !== b.length) return false;
+    for (var i = 0; i < b.length; i++) if (a.indexOf(b[i]) < 0) return false;
+    return true;
+  }
+  function pct(c, n) { return n ? Math.round(c / n * 100) : 0; }
+  function fmtTime(sec) { var m = Math.floor(sec / 60), s = sec % 60; return m + ':' + String(s).padStart(2, '0'); }
+  function fmtDate(t) {
+    var d = new Date(t);
+    return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+  function chQs(ch) { return DATA.questions.filter(function (q) { return q.ch === ch; }); }
+
+  /* ---------- stats ---------- */
+  function statsFor(qs) {
+    var s = { total: qs.length, done: 0, ok: 0, ng: 0, n: 0, c: 0 };
+    qs.forEach(function (q) {
+      var r = store.rec[q.id];
+      if (!r) return;
+      s.done++; s.n += r.n; s.c += r.c;
+      if (r.last === 1) s.ok++; else s.ng++;
+    });
+    return s;
+  }
+  function weakIds() {
+    return DATA.questions.filter(function (q) { var r = store.rec[q.id]; return r && r.last === 0; }).map(function (q) { return q.id; });
+  }
+  function streak() {
+    var d = new Date();
+    if (!store.days[dayKey(d)]) d.setDate(d.getDate() - 1);
+    var k = 0;
+    while (store.days[dayKey(d)]) { k++; d.setDate(d.getDate() - 1); }
+    return k;
+  }
+  function record(id, ok) {
+    var r = store.rec[id] || { n: 0, c: 0 };
+    r.n++; if (ok) r.c++;
+    r.last = ok ? 1 : 0; r.t = Date.now();
+    store.rec[id] = r;
+    var k = dayKey();
+    store.days[k] = (store.days[k] || 0) + 1;
+  }
+
+  /* ---------- routing ---------- */
+  function route() { return (location.hash || '#home').slice(1) || 'home'; }
+  function go(r, replace) {
+    if (replace) { try { history.replaceState(null, '', '#' + r); } catch (e) { location.hash = r; } render(); return; }
+    if (route() === r) render(); else location.hash = r;
+  }
+  window.addEventListener('hashchange', render);
+
+  /* ---------- sessions ---------- */
+  function startSession(mode, ids, title, opt) {
+    opt = opt || {};
+    if (!ids.length) return;
+    var order = {};
+    ids.forEach(function (id) {
+      var q = QMAP[id];
+      var idx = q.choices.map(function (_, i) { return i; });
+      order[id] = q.shuffle ? shuffle(idx) : idx;
+    });
+    store.session = {
+      mode: mode, title: title, ids: ids, i: opt.start || 0, order: order, picked: [],
+      answered: false, results: [], start: Date.now(), back: opt.back || 'home', done: false
+    };
+    resetOpen = false;
+    save();
+    go('quiz');
+  }
+  function pickMock(total) {
+    var by = {};
+    DATA.questions.forEach(function (q) { (by[q.ch] = by[q.ch] || []).push(q.id); });
+    var N = DATA.questions.length;
+    if (total >= N) return DATA.chapters.reduce(function (a, c) { return a.concat(shuffle(by[c.id] || [])); }, []);
+    var quotas = DATA.chapters.map(function (c) {
+      var exact = (by[c.id] || []).length * total / N;
+      return { ch: c.id, base: Math.floor(exact), rem: exact - Math.floor(exact) };
+    });
+    var left = total - quotas.reduce(function (a, q) { return a + q.base; }, 0);
+    quotas.slice().sort(function (a, b) { return b.rem - a.rem; }).forEach(function (q) { if (left > 0) { q.base++; left--; } });
+    return quotas.reduce(function (a, q) { return a.concat(shuffle(by[q.ch] || []).slice(0, q.base)); }, []);
+  }
+  function finish() {
+    var s = store.session;
+    s.done = true; s.end = Date.now(); s.picked = [];
+    if (s.mode === 'mock') {
+      var by = {};
+      s.results.forEach(function (r) {
+        record(r.id, r.ok);
+        var ch = QMAP[r.id].ch;
+        by[ch] = by[ch] || [0, 0];
+        by[ch][1]++; if (r.ok) by[ch][0]++;
+      });
+      store.mocks.unshift({
+        t: s.end, n: s.results.length, c: s.results.filter(function (r) { return r.ok; }).length,
+        sec: Math.round((s.end - s.start) / 1000), by: by
+      });
+      store.mocks = store.mocks.slice(0, 20);
+    }
+    save();
+    go('result', true);
+  }
+
+  /* ---------- actions ---------- */
+  app.addEventListener('click', function (ev) {
+    var el = ev.target.closest('[data-act]');
+    if (!el || el.getAttribute('aria-disabled') === 'true') return;
+    var act = el.getAttribute('data-act');
+    var s = store.session;
+
+    if (act === 'pick') {
+      var q = QMAP[s.ids[s.i]];
+      var ci = Number(el.getAttribute('data-ci'));
+      if (s.answered) return;
+      if (q.type === 'multi') {
+        var at = s.picked.indexOf(ci);
+        if (at >= 0) s.picked.splice(at, 1); else s.picked.push(ci);
+        save(); render(); return;
+      }
+      s.picked = [ci];
+      if (s.mode === 'mock') { save(); render(); return; }
+      submit(); return;
+    }
+    if (act === 'submit') { submit(); return; }
+    if (act === 'next') { nextQuestion(); return; }
+    if (act === 'skip') { s.picked = []; nextQuestion(); return; }
+    if (act === 'quit') { var back = s.back; go(back); return; }
+    if (act === 'resume') { go('quiz'); return; }
+    if (act === 'weak') { startSession('weak', shuffle(weakIds()), '苦手ノート'); return; }
+    if (act === 'mock') {
+      var n = Number(el.getAttribute('data-n'));
+      startSession('mock', pickMock(n), n >= DATA.questions.length ? '全問模試' : 'ミニ模試', { back: 'home' });
+      return;
+    }
+    if (act === 'ch-start') {
+      var chn = Number(el.getAttribute('data-ch'));
+      var how = el.getAttribute('data-how');
+      var ids = chQs(chn).map(function (x) { return x.id; });
+      if (how === 'shuffle') ids = shuffle(ids);
+      if (how === 'todo') ids = ids.filter(function (id) { var r = store.rec[id]; return !r || r.last !== 1; });
+      startSession('chapter', ids, CHMAP[chn].title, { back: 'ch-' + chn });
+      return;
+    }
+    if (act === 'start-at') {
+      var c2 = Number(el.getAttribute('data-ch'));
+      var ids2 = chQs(c2).map(function (x) { return x.id; });
+      startSession('chapter', ids2, CHMAP[c2].title, { back: 'ch-' + c2, start: Number(el.getAttribute('data-i')) });
+      return;
+    }
+    if (act === 'retry') {
+      var wrong = s.results.filter(function (r) { return !r.ok; }).map(function (r) { return r.id; });
+      startSession('retry', shuffle(wrong), '解き直し', { back: 'home' });
+      return;
+    }
+    if (act === 'reset-open') { resetOpen = true; render(); return; }
+    if (act === 'reset-cancel') { resetOpen = false; render(); return; }
+    if (act === 'reset-do') {
+      store = { rec: {}, mocks: [], days: {}, session: null };
+      resetOpen = false; save(); render(); return;
+    }
+  });
+
+  function submit() {
+    var s = store.session;
+    var id = s.ids[s.i], q = QMAP[id];
+    if (!s.picked.length) return;
+    var ok = sameSet(s.picked, q.answer);
+    s.answered = true;
+    s.results.push({ id: id, picked: s.picked.slice(), ok: ok });
+    record(id, ok);
+    save(); render();
+    var v = document.querySelector('.verdict');
+    if (v && v.scrollIntoView) {
+      var rm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      v.scrollIntoView({ behavior: rm ? 'auto' : 'smooth', block: 'nearest' });
+    }
+  }
+  function nextQuestion() {
+    var s = store.session;
+    if (s.mode === 'mock') {
+      var id = s.ids[s.i], q = QMAP[id];
+      s.results.push({ id: id, picked: s.picked.slice(), ok: s.picked.length > 0 && sameSet(s.picked, q.answer) });
+    }
+    s.i++; s.picked = []; s.answered = false;
+    if (s.i >= s.ids.length) { finish(); return; }
+    save(); render();
+    window.scrollTo(0, 0);
+  }
+
+  /* ---------- views ---------- */
+  function render() {
+    if (tick) { clearInterval(tick); tick = null; }
+    if (!DATA) return;
+    var r = route();
+    var html;
+    if (r === 'quiz') html = viewQuiz();
+    else if (r === 'result') html = viewResult();
+    else if (r === 'stats') html = viewStats();
+    else if (/^ch-\d+$/.test(r) && CHMAP[Number(r.slice(3))]) html = viewChapter(Number(r.slice(3)));
+    else html = viewHome();
+    if (html === null) return;
+    app.innerHTML = html;
+    if (r !== lastRoute) { window.scrollTo(0, 0); lastRoute = r; }
+    if (r === 'quiz' && store.session && store.session.mode === 'mock') {
+      var t = document.getElementById('timer');
+      tick = setInterval(function () {
+        if (t && store.session) t.textContent = fmtTime(Math.round((Date.now() - store.session.start) / 1000));
+      }, 1000);
+    }
+  }
+
+  function bar(s) {
+    return '<span class="bar" aria-hidden="true"><i class="b-ok" style="width:' + pct(s.ok, s.total) + '%"></i><i class="b-ng" style="width:' + pct(s.ng, s.total) + '%"></i></span>';
+  }
+
+  function viewHome() {
+    var all = statsFor(DATA.questions);
+    var weak = weakIds().length;
+    var todayN = store.days[dayKey()] || 0;
+    var s = store.session;
+    var h = '<div class="wrap">';
+    h += '<header class="plate"><p class="plate-top">古物営業法と関連法令</p><h1 class="plate-name">リユース検定 演習帳</h1>' +
+      '<p class="plate-bottom">全' + DATA.chapters.length + '章・' + DATA.questions.length + '問</p></header>';
+
+    if (s && !s.done) {
+      h += '<button type="button" class="btn resume" data-act="resume"><span class="grow">続きから再開' +
+        '<span class="sub">' + esc(s.title) + '・' + (s.i + 1) + '問目 / ' + s.ids.length + '問</span></span><span class="chev">›</span></button>';
+    }
+
+    h += '<section class="card stats-row" aria-label="学習の状況">' +
+      '<div class="stat"><span class="stat-label">今日解いた</span><span class="stat-value">' + todayN + '<small>問</small></span></div>' +
+      '<div class="stat"><span class="stat-label">連続学習</span><span class="stat-value">' + streak() + '<small>日</small></span></div>' +
+      '<div class="stat"><span class="stat-label">正答率</span><span class="stat-value">' + (all.n ? pct(all.c, all.n) + '<small>%</small>' : '—') + '</span></div>' +
+      '</section>';
+
+    h += '<section class="stack"><h2 class="section-label">今日の演習</h2>';
+    h += '<button type="button" class="btn" data-act="weak"' + (weak ? '' : ' aria-disabled="true"') + '>' +
+      '<span class="grow">苦手ノート<span class="sub">' + (weak ? '最後に間違えた問題をまとめて解き直す' : '間違えた問題がここにたまります') + '</span></span>' +
+      '<span class="pricetag' + (weak ? '' : ' is-zero') + '">' + weak + '</span></button>';
+    h += '<button type="button" class="btn btn-primary" data-act="mock" data-n="20"><span class="grow">ミニ模試 20問' +
+      '<span class="sub">全章から出題。採点は最後にまとめて</span></span><span class="chev">›</span></button>';
+    h += '<button type="button" class="btn" data-act="mock" data-n="' + DATA.questions.length + '"><span class="grow">全' + DATA.questions.length + '問 通し模試' +
+      '<span class="sub">章の順に全問。受験直前の総仕上げに</span></span><span class="chev">›</span></button>';
+    h += '</section>';
+
+    h += '<section class="stack"><h2 class="section-label">章ごとに解く</h2><div class="card"><ul class="ch-list">';
+    DATA.chapters.forEach(function (c) {
+      var st = statsFor(chQs(c.id));
+      h += '<li><a class="ch-row" href="#ch-' + c.id + '"><span class="ch-no">' + c.id + '</span><span class="ch-body">' +
+        '<span class="ch-title">' + esc(c.title) + '<span>' + esc(c.subtitle) + '</span></span>' + bar(st) +
+        '<span class="ch-meta">正解済み ' + st.ok + ' / ' + st.total + (st.ng ? '・要復習 ' + st.ng : '') + '</span></span><span class="chev">›</span></a></li>';
+    });
+    h += '</ul><div class="legend"><span><i style="background:var(--ok)"></i>正解済み</span><span><i style="background:var(--ng)"></i>要復習</span><span><i style="background:var(--line)"></i>未回答</span></div></div></section>';
+
+    h += '<footer class="foot"><a href="#stats">学習記録と模試の履歴を見る</a>' +
+      '<p>記録はこの端末のブラウザにだけ保存されます。</p>' +
+      '<p>問題と解説は' + esc(DATA.asOf || '2026年11月1日') + '時点の法令で確認しています。</p></footer>';
+    h += '</div>';
+    return h;
+  }
+
+  function viewChapter(n) {
+    var c = CHMAP[n], qs = chQs(n), st = statsFor(qs);
+    var todo = qs.filter(function (q) { var r = store.rec[q.id]; return !r || r.last !== 1; }).length;
+    var h = '<div class="wrap"><a class="back" href="#home">‹ ホーム</a>';
+    h += '<header class="stack"><h1 class="page-title"><small>' + esc(c.title) + '</small>' + esc(c.subtitle) + '</h1>' +
+      '<div class="card stats-row"><div class="stat"><span class="stat-label">問題数</span><span class="stat-value">' + st.total + '<small>問</small></span></div>' +
+      '<div class="stat"><span class="stat-label">正解済み</span><span class="stat-value">' + st.ok + '<small>問</small></span></div>' +
+      '<div class="stat"><span class="stat-label">正答率</span><span class="stat-value">' + (st.n ? pct(st.c, st.n) + '<small>%</small>' : '—') + '</span></div></div></header>';
+    h += '<section class="stack">';
+    h += '<button type="button" class="btn btn-primary" data-act="ch-start" data-ch="' + n + '" data-how="order"><span class="grow">順番に解く<span class="sub">1問ずつ答え合わせと解説</span></span><span class="chev">›</span></button>';
+    h += '<div class="btn-row">' +
+      '<button type="button" class="btn btn-center" data-act="ch-start" data-ch="' + n + '" data-how="shuffle">シャッフル</button>' +
+      '<button type="button" class="btn btn-center" data-act="ch-start" data-ch="' + n + '" data-how="todo"' + (todo ? '' : ' aria-disabled="true"') + '>未正解だけ（' + todo + '）</button></div>';
+    h += '</section>';
+    h += '<section class="stack"><h2 class="section-label">問題一覧</h2><div class="card"><ul class="q-list">';
+    qs.forEach(function (q, i) {
+      var r = store.rec[q.id];
+      var dot = !r ? '' : (r.last === 1 ? ' ok' : ' ng');
+      var label = !r ? '未回答' : (r.last === 1 ? '正解済み' : '要復習');
+      h += '<li><button type="button" class="q-row" data-act="start-at" data-ch="' + n + '" data-i="' + i + '">' +
+        '<span class="dot' + dot + '" role="img" aria-label="' + label + '"></span>' +
+        '<span class="q-row-text"><span class="mono">' + q.id + '</span><span class="clamp">' + esc(q.q.replace(/\n/g, ' ')) + '</span></span></button></li>';
+    });
+    h += '</ul></div></section></div>';
+    return h;
+  }
+
+  function viewQuiz() {
+    var s = store.session;
+    if (!s || s.done) { go('home', true); return null; }
+    var id = s.ids[s.i], q = QMAP[id], perm = s.order[id];
+    var mock = s.mode === 'mock', multi = q.type === 'multi', ox = q.format === 'ox';
+    var answered = s.answered && !mock;
+    var last = answered ? s.results[s.results.length - 1] : null;
+
+    var h = '<div class="wrap quiz">';
+    h += '<div class="topbar"><div class="topbar-row">' +
+      '<button type="button" class="quit" data-act="quit">中断</button>' +
+      '<p class="topbar-title">' + esc(s.title) + '・' + (s.i + 1) + ' / ' + s.ids.length + '</p>' +
+      '<p class="topbar-side">' + (mock ? '<span id="timer">' + fmtTime(Math.round((Date.now() - s.start) / 1000)) + '</span>' : '') + '</p></div>' +
+      '<div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="' + s.ids.length + '" aria-valuenow="' + s.i + '"><i style="width:' + pct(s.i, s.ids.length) + '%"></i></div></div>';
+
+    h += '<div class="stack"><p class="q-meta"><span class="mono">' + q.id + '</span><span>' + esc(CHMAP[q.ch].title) + '</span><span>' + LEVEL[q.level] + '</span>' +
+      (multi ? '<span class="chip multi">当てはまるものをすべて選ぶ</span>' : '') + '</p>' +
+      '<h1 class="q-text">' + esc(q.q) + '</h1></div>';
+
+    h += '<div class="choices' + (ox ? ' ox' : '') + '" role="group" aria-label="選択肢">';
+    perm.forEach(function (ci, k) {
+      var sel = s.picked.indexOf(ci) >= 0;
+      var isAns = q.answer.indexOf(ci) >= 0;
+      var cls = 'choice', tag = '';
+      if (answered) {
+        var picked = last.picked.indexOf(ci) >= 0;
+        if (isAns && picked) { cls += ' is-correct'; tag = '正解'; }
+        else if (isAns) { cls += multi ? ' is-missed' : ' is-correct'; tag = multi ? '選び忘れ' : '正解'; }
+        else if (picked) { cls += ' is-wrong'; tag = '誤り'; }
+        else cls += ' is-dim';
+      } else if (sel) cls += ' is-picked';
+      h += '<button type="button" class="' + cls + '" data-act="pick" data-ci="' + ci + '" aria-pressed="' + sel + '"' + (answered ? ' aria-disabled="true"' : '') + '>' +
+        (ox ? '' : '<span class="choice-key">' + KANA[k] + '</span>') +
+        '<span class="choice-text">' + esc(q.choices[ci]) + '</span>' +
+        (tag ? '<span class="choice-tag">' + tag + '</span>' : (multi && !answered ? '<span class="check" aria-hidden="true"></span>' : (ox ? '' : '<span></span>'))) +
+        '</button>';
+    });
+    h += '</div>';
+
+    if (answered) {
+      var ok = last.ok;
+      var sub = '';
+      if (multi) {
+        var hit = last.picked.filter(function (x) { return q.answer.indexOf(x) >= 0; }).length;
+        var miss = last.picked.length - hit;
+        sub = '正解は' + q.answer.length + 'つ。そのうち' + hit + 'つを選べています' + (miss ? '。誤りを' + miss + 'つ選んでいます' : '') + '。';
+      }
+      h += '<section class="verdict ' + (ok ? 'ok' : 'ng') + '" aria-live="polite">' +
+        '<div class="verdict-head"><span class="mark ' + (ok ? 'ok' : 'ng') + '" aria-hidden="true"></span><p class="verdict-title">' + (ok ? '正解' : '不正解') + '</p></div>' +
+        (sub && !ok ? '<p class="verdict-sub">' + sub + '</p>' : '') +
+        (ok && (s.mode === 'weak' || s.mode === 'retry') ? '<p class="note">苦手ノートから外れました</p>' : '') +
+        (!ok ? '<p class="verdict-sub">苦手ノートに入りました。正解すると外れます。</p>' : '') +
+        '<p class="exp-label">解説</p><p class="exp">' + esc(q.exp) + '</p></section>';
+    }
+
+    h += '<div class="actionbar">';
+    var isLast = s.i === s.ids.length - 1;
+    if (mock) {
+      h += '<button type="button" class="btn-main" data-act="next"' + (s.picked.length ? '' : ' disabled') + '>' + (isLast ? '採点する' : '次へ') + '</button>';
+      h += '<button type="button" class="link-btn" data-act="skip">わからないので次へ（不正解として採点）</button>';
+    } else if (answered) {
+      h += '<button type="button" class="btn-main" data-act="next">' + (isLast ? '結果を見る' : '次の問題へ') + '</button>';
+    } else if (multi) {
+      h += '<button type="button" class="btn-main" data-act="submit"' + (s.picked.length ? '' : ' disabled') + '>回答する（' + s.picked.length + 'つ選択中）</button>';
+    } else {
+      h += '<p class="hint">選択肢をタップすると答え合わせします</p>';
+    }
+    h += '</div></div>';
+    return h;
+  }
+
+  function ring(c, n) {
+    var r = 38, len = 2 * Math.PI * r, p = n ? c / n : 0;
+    return '<svg class="score-ring" viewBox="0 0 92 92" aria-hidden="true">' +
+      '<circle cx="46" cy="46" r="' + r + '" fill="none" stroke="var(--line)" stroke-width="9"></circle>' +
+      '<circle cx="46" cy="46" r="' + r + '" fill="none" stroke="var(--ok)" stroke-width="9" stroke-linecap="round" ' +
+      'stroke-dasharray="' + (len * p).toFixed(1) + ' ' + len.toFixed(1) + '" transform="rotate(-90 46 46)"></circle>' +
+      '<text x="46" y="52" text-anchor="middle" font-size="18" font-weight="700" fill="var(--ink)" font-family="var(--f-display)">' + pct(c, n) + '%</text></svg>';
+  }
+
+  function viewResult() {
+    var s = store.session;
+    if (!s || !s.done) { go('home', true); return null; }
+    var n = s.results.length, c = s.results.filter(function (r) { return r.ok; }).length;
+    var wrong = n - c;
+    var h = '<div class="wrap"><a class="back" href="#home">‹ ホーム</a>';
+    h += '<h1 class="page-title"><small>' + esc(s.title) + 'の結果</small>' + (s.mode === 'mock' ? '採点しました' : 'おつかれさまでした') + '</h1>';
+    h += '<section class="card score">' + ring(c, n) + '<div><p class="score-big">' + c + '<small> / ' + n + '問</small></p>' +
+      '<p class="verdict-sub">' + (s.mode === 'mock' ? '所要時間 ' + fmtTime(Math.round((s.end - s.start) / 1000)) : '正解 ' + c + '問・不正解 ' + wrong + '問') + '</p></div></section>';
+
+    var chs = {};
+    s.results.forEach(function (r) { var ch = QMAP[r.id].ch; chs[ch] = chs[ch] || [0, 0]; chs[ch][1]++; if (r.ok) chs[ch][0]++; });
+    var keys = Object.keys(chs);
+    if (keys.length > 1) {
+      h += '<section class="stack"><h2 class="section-label">章ごとの得点</h2><div class="card"><ul class="breakdown">';
+      keys.sort().forEach(function (k) {
+        var v = chs[k];
+        h += '<li><span>' + esc(CHMAP[k].title) + '</span><span class="bar" aria-hidden="true"><i class="b-ok" style="width:' + pct(v[0], v[1]) + '%"></i></span><span class="r">' + v[0] + ' / ' + v[1] + '</span></li>';
+      });
+      h += '</ul></div></section>';
+    }
+
+    h += '<section class="stack">';
+    if (wrong) h += '<button type="button" class="btn btn-primary" data-act="retry"><span class="grow">間違えた' + wrong + '問を解き直す<span class="sub">解説つきで1問ずつ</span></span><span class="chev">›</span></button>';
+    h += '<a class="btn" href="#home"><span class="grow">ホームに戻る</span><span class="chev">›</span></a></section>';
+
+    h += '<section class="stack"><h2 class="section-label">1問ずつ確認</h2><div class="card">';
+    s.results.forEach(function (r) {
+      var q = QMAP[r.id];
+      var yours = r.picked.length ? r.picked.map(function (x) { return q.choices[x]; }).join('／') : '（回答なし）';
+      var right = q.answer.map(function (x) { return q.choices[x]; }).join('／');
+      h += '<details class="rq"><summary><span class="mk ' + (r.ok ? 'ok' : 'ng') + '">' + (r.ok ? '○' : '×') + '</span>' +
+        '<span class="q-row-text"><span class="mono">' + q.id + '</span><span class="clamp">' + esc(q.q.replace(/\n/g, ' ')) + '</span></span><span class="chev">›</span></summary>' +
+        '<div class="rq-body"><dl><dt>あなた</dt><dd>' + esc(yours) + '</dd><dt>正解</dt><dd>' + esc(right) + '</dd></dl>' +
+        '<p class="exp">' + esc(q.exp) + '</p></div></details>';
+    });
+    h += '</div></section></div>';
+    return h;
+  }
+
+  function viewStats() {
+    var all = statsFor(DATA.questions);
+    var h = '<div class="wrap"><a class="back" href="#home">‹ ホーム</a><h1 class="page-title"><small>学習記録</small>これまでの成績</h1>';
+    h += '<section class="card stats-row"><div class="stat"><span class="stat-label">解いた問題</span><span class="stat-value">' + all.done + '<small>/ ' + all.total + '</small></span></div>' +
+      '<div class="stat"><span class="stat-label">回答した回数</span><span class="stat-value">' + all.n + '<small>回</small></span></div>' +
+      '<div class="stat"><span class="stat-label">正答率</span><span class="stat-value">' + (all.n ? pct(all.c, all.n) + '<small>%</small>' : '—') + '</span></div></section>';
+
+    h += '<section class="stack"><h2 class="section-label">章ごとの正答率</h2><div class="card"><ul class="breakdown">';
+    DATA.chapters.forEach(function (c) {
+      var st = statsFor(chQs(c.id));
+      h += '<li><span>' + esc(c.title) + '</span><span class="bar" aria-hidden="true"><i class="b-ok" style="width:' + pct(st.c, st.n) + '%"></i></span><span class="r">' + (st.n ? pct(st.c, st.n) + '%' : '—') + '</span></li>';
+    });
+    h += '</ul></div></section>';
+
+    h += '<section class="stack"><h2 class="section-label">模試の履歴</h2><div class="card">';
+    if (!store.mocks.length) h += '<p class="empty">まだ模試を受けていません。ホームの「ミニ模試 20問」から始められます。</p>';
+    else {
+      h += '<div class="table-wrap"><table><thead><tr><th>日時</th><th class="r">得点</th><th class="r">正答率</th><th class="r">時間</th></tr></thead><tbody>';
+      store.mocks.forEach(function (m) {
+        h += '<tr><td>' + fmtDate(m.t) + '</td><td class="r">' + m.c + ' / ' + m.n + '</td><td class="r">' + pct(m.c, m.n) + '%</td><td class="r">' + fmtTime(m.sec) + '</td></tr>';
+      });
+      h += '</tbody></table></div>';
+    }
+    h += '</div></section>';
+
+    h += '<section class="stack"><h2 class="section-label">記録の削除</h2><div class="card">';
+    if (!resetOpen) h += '<div class="confirm"><p class="verdict-sub">この端末の正解記録・苦手ノート・模試の履歴をすべて消します。</p><button type="button" class="btn btn-center danger" data-act="reset-open">記録をすべて消す</button></div>';
+    else h += '<div class="confirm"><p><strong>本当に消しますか？</strong> 消した記録は元に戻せません。</p><div class="btn-row">' +
+      '<button type="button" class="btn btn-danger" data-act="reset-do">消す</button><button type="button" class="btn" data-act="reset-cancel">やめる</button></div></div>';
+    h += '</div></section></div>';
+    return h;
+  }
+
+  /* ---------- boot ---------- */
+  function boot(d) {
+    DATA = d;
+    QMAP = {}; CHMAP = {};
+    d.questions.forEach(function (q) { QMAP[q.id] = q; });
+    d.chapters.forEach(function (c) { CHMAP[c.id] = c; });
+    if (store.session && store.session.ids && store.session.ids.some(function (id) { return !QMAP[id]; })) store.session = null;
+    render();
+  }
+  var inline = document.getElementById('qdata');
+  var txt = inline ? inline.textContent.trim() : '';
+  if (txt && txt.charAt(0) === '{') {
+    boot(JSON.parse(txt));
+  } else {
+    fetch('questions.json', { cache: 'no-cache' })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(boot)
+      .catch(function () {
+        app.innerHTML = '<div class="wrap"><p class="loading">問題データを読み込めませんでした。通信状況を確認して、ページを再読み込みしてください。</p></div>';
+      });
+  }
+})();
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+}
+</script>
+</body>
+</html>
