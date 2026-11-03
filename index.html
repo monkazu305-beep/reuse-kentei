@@ -703,7 +703,9 @@ td.r, th.r { text-align: right; }
   }
 
   function viewChapter(n) {
-    var c = CHMAP[n], qs = chQs(n), st = statsFor(qs);
+    var c = CHMAP[n];
+    if (!c) { go('home', true); return null; }
+    var qs = chQs(n), st = statsFor(qs);
     var todo = qs.filter(function (q) { var r = store.rec[q.id]; return !r || r.last !== 1; }).length;
     var h = '<div class="wrap"><a class="back" href="#home">‹ ホーム</a>';
     h += '<header class="stack"><h1 class="page-title"><small>' + esc(c.title) + '</small>' + esc(c.subtitle) + '</h1>' +
@@ -900,6 +902,21 @@ td.r, th.r { text-align: right; }
     QMAP = {}; CHMAP = {};
     d.questions.forEach(function (q) { QMAP[q.id] = q; });
     d.chapters.forEach(function (c) { CHMAP[c.id] = c; });
+    if (d.moved) {
+      // questions that changed id keep their records and note entries
+      var mv = d.moved, changed = false;
+      ['rec', 'weak'].forEach(function (k) {
+        Object.keys(store[k]).forEach(function (id) {
+          var to = mv[id];
+          if (!to) return;
+          if (!store[k][to]) store[k][to] = store[k][id];
+          delete store[k][id];
+          changed = true;
+        });
+      });
+      if (store.session && store.session.ids && store.session.ids.some(function (id) { return mv[id]; })) { store.session = null; changed = true; }
+      if (changed) save();
+    }
     if (store.session && store.session.ids && store.session.ids.some(function (id) { return !QMAP[id]; })) store.session = null;
     render();
   }

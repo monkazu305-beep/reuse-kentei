@@ -1,7 +1,7 @@
 {
   "name": "リユース検定 演習帳",
   "short_name": "検定演習帳",
-  "description": "リユース検定の演習アプリ（全6章・95問）",
+  "description": "リユース検定の演習アプリ（全5章・95問）",
   "lang": "ja",
   "start_url": "./#home",
   "scope": "./",
