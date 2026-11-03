@@ -937,7 +937,7 @@ td.r, th.r { text-align: right; }
     h += '<ul class="notes">' +
       '<li>本番と同じく、途中で答え合わせはしません。最後にまとめて採点します。</li>' +
       '<li>中断しても時間は進みます。' + EXAM.sec / 60 + '分たつと、その時点で採点します。</li>' +
-      '<li>全章から章の割合に合わせて出題します。「すべて選べ」の問題は出ません。</li></ul>';
+      '<li>全章から、章の問題数の割合に合わせて出題します。</li></ul>';
     var last = store.mocks.filter(function (m) { return m.exam; })[0];
     if (last) h += '<p class="verdict-sub">前回の本番模試：' + last.score + '点（' + (last.pass ? '合格' : '不合格') + '）・' + fmtDate(last.t) + '</p>';
     h += '<button type="button" class="btn btn-primary btn-center" data-act="exam-start"><span class="grow">開始する（' + EXAM.sec / 60 + '分）</span></button>';
