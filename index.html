@@ -302,7 +302,11 @@ button { font: inherit; color: inherit; }
 .verdict-sub { font-size: 14px; color: var(--muted); }
 .exp-label { font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: 0.1em; border-top: 1px solid var(--line); padding-top: 10px; }
 .exp { font-size: 15px; line-height: 1.85; }
-.note { font-size: 13px; color: var(--ok); font-weight: 700; }
+.note-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
+.mini-btn {
+  padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface);
+  font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
 
 .actionbar {
   position: sticky; bottom: 0; z-index: 4; margin-top: var(--s2);
@@ -389,6 +393,7 @@ td.r, th.r { text-align: right; }
   var tick = null;
   var resetOpen = false;
   var lastRoute = null;
+  var justRemoved = null;
 
   /* ---------- storage (this device only; works in memory if storage is blocked) ---------- */
   function loadStore() {
@@ -396,10 +401,17 @@ td.r, th.r { text-align: right; }
       var raw = localStorage.getItem(STORE_KEY);
       if (raw) {
         var s = JSON.parse(raw);
-        return { rec: s.rec || {}, mocks: s.mocks || [], days: s.days || {}, session: s.session || null };
+        var rec = s.rec || {};
+        var weak = s.weak;
+        if (!weak) {
+          // older saves kept no note: start it from the questions last answered wrong
+          weak = {};
+          Object.keys(rec).forEach(function (id) { if (rec[id].last === 0) weak[id] = { t: rec[id].t || Date.now() }; });
+        }
+        return { rec: rec, weak: weak, mocks: s.mocks || [], days: s.days || {}, session: s.session || null };
       }
     } catch (e) {}
-    return { rec: {}, mocks: [], days: {}, session: null };
+    return { rec: {}, weak: {}, mocks: [], days: {}, session: null };
   }
   function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) {} }
 
@@ -443,7 +455,7 @@ td.r, th.r { text-align: right; }
     return s;
   }
   function weakIds() {
-    return DATA.questions.filter(function (q) { var r = store.rec[q.id]; return r && r.last === 0; }).map(function (q) { return q.id; });
+    return DATA.questions.filter(function (q) { return !!store.weak[q.id]; }).map(function (q) { return q.id; });
   }
   function streak() {
     var d = new Date();
@@ -457,6 +469,7 @@ td.r, th.r { text-align: right; }
     r.n++; if (ok) r.c++;
     r.last = ok ? 1 : 0; r.t = Date.now();
     store.rec[id] = r;
+    if (!ok && !store.weak[id]) store.weak[id] = { t: Date.now() };
     var k = dayKey();
     store.days[k] = (store.days[k] || 0) + 1;
   }
@@ -574,8 +587,18 @@ td.r, th.r { text-align: right; }
     }
     if (act === 'reset-open') { resetOpen = true; render(); return; }
     if (act === 'reset-cancel') { resetOpen = false; render(); return; }
+    if (act === 'weak-remove') {
+      var wid = el.getAttribute('data-id');
+      delete store.weak[wid]; justRemoved = wid;
+      save(); render(); return;
+    }
+    if (act === 'weak-add') {
+      var aid = el.getAttribute('data-id');
+      store.weak[aid] = { t: Date.now() }; justRemoved = null;
+      save(); render(); return;
+    }
     if (act === 'reset-do') {
-      store = { rec: {}, mocks: [], days: {}, session: null };
+      store = { rec: {}, weak: {}, mocks: [], days: {}, session: null };
       resetOpen = false; save(); render(); return;
     }
   });
@@ -601,7 +624,7 @@ td.r, th.r { text-align: right; }
       var id = s.ids[s.i], q = QMAP[id];
       s.results.push({ id: id, picked: s.picked.slice(), ok: s.picked.length > 0 && sameSet(s.picked, q.answer) });
     }
-    s.i++; s.picked = []; s.answered = false;
+    s.i++; s.picked = []; s.answered = false; justRemoved = null;
     if (s.i >= s.ids.length) { finish(); return; }
     save(); render();
     window.scrollTo(0, 0);
@@ -655,7 +678,7 @@ td.r, th.r { text-align: right; }
 
     h += '<section class="stack"><h2 class="section-label">今日の演習</h2>';
     h += '<button type="button" class="btn" data-act="weak"' + (weak ? '' : ' aria-disabled="true"') + '>' +
-      '<span class="grow">苦手ノート<span class="sub">' + (weak ? '最後に間違えた問題をまとめて解き直す' : '間違えた問題がここにたまります') + '</span></span>' +
+      '<span class="grow">苦手ノート<span class="sub">' + (weak ? '間違えた問題を解き直す。覚えたら自分で外せます' : '間違えた問題がここにたまります') + '</span></span>' +
       '<span class="pricetag' + (weak ? '' : ' is-zero') + '">' + weak + '</span></button>';
     h += '<button type="button" class="btn btn-primary" data-act="mock" data-n="20"><span class="grow">ミニ模試 20問' +
       '<span class="sub">全章から出題。採点は最後にまとめて</span></span><span class="chev">›</span></button>';
@@ -756,8 +779,7 @@ td.r, th.r { text-align: right; }
       h += '<section class="verdict ' + (ok ? 'ok' : 'ng') + '" aria-live="polite">' +
         '<div class="verdict-head"><span class="mark ' + (ok ? 'ok' : 'ng') + '" aria-hidden="true"></span><p class="verdict-title">' + (ok ? '正解' : '不正解') + '</p></div>' +
         (sub && !ok ? '<p class="verdict-sub">' + sub + '</p>' : '') +
-        (ok && (s.mode === 'weak' || s.mode === 'retry') ? '<p class="note">苦手ノートから外れました</p>' : '') +
-        (!ok ? '<p class="verdict-sub">苦手ノートに入りました。正解すると外れます。</p>' : '') +
+        weakLine(id, ok) +
         '<p class="exp-label">解説</p><p class="exp">' + esc(q.exp) + '</p></section>';
     }
 
@@ -775,6 +797,19 @@ td.r, th.r { text-align: right; }
     }
     h += '</div></div>';
     return h;
+  }
+
+  function weakLine(id, ok) {
+    var row = function (text, act, label) {
+      return '<div class="note-row"><p class="verdict-sub">' + text + '</p>' +
+        '<button type="button" class="mini-btn" data-act="' + act + '" data-id="' + id + '">' + label + '</button></div>';
+    };
+    if (store.weak[id]) {
+      return ok ? row('苦手ノートに残しています。', 'weak-remove', '覚えたので外す')
+                : row('苦手ノートに入っています。', 'weak-remove', 'ノートから外す');
+    }
+    if (justRemoved === id) return row('苦手ノートから外しました。', 'weak-add', 'ノートに戻す');
+    return '';
   }
 
   function ring(c, n) {
