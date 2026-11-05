@@ -1,6 +1,6 @@
 // リユース検定演習帳 service worker
 // 問題を更新したら VERSION の日付を変えてください（古いキャッシュが入れ替わります）。
-const VERSION = 'kentei-2026-11-03';
+const VERSION = 'kentei-2026-11-05';
 const SHELL = ['./', './index.html', './questions.json', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 
