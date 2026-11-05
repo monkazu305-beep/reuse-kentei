@@ -574,7 +574,9 @@ td.r, th.r { text-align: right; }
       var m = { t: s.end, n: s.results.length, c: c, sec: s.limit ? Math.min(sec, s.limit) : sec, by: by };
       if (s.exam) { m.exam = true; m.score = examScore(c); m.pass = m.score >= EXAM.pass; m.timeUp = !!s.timeUp; }
       store.mocks.unshift(m);
-      store.mocks = store.mocks.slice(0, 20);
+      // 本番模試の記録はすべて残す。ミニ模試・全問模試は直近20回まで
+      var nOther = 0;
+      store.mocks = store.mocks.filter(function (x) { return x.exam || nOther++ < 20; });
     }
     save();
     go('result', true);
